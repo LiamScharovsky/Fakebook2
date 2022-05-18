@@ -6,7 +6,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_mail import Mail
-
+from flask_cors import CORS
 
 
 moment = Moment()
@@ -14,7 +14,7 @@ db = SQLAlchemy()           #Object Relational Mapper
 migrate = Migrate()         #Handle transaction of database
 login = LoginManager()  # handle login session
 mail = Mail()   #handles sending mail
-
+cors = CORS()   #handles sending cross-origin requests
 
 def createApp(configClass=Config):      
     app = Flask(__name__)
@@ -24,6 +24,8 @@ def createApp(configClass=Config):
     migrate.init_app(app, db)                   #migration takes both the transformation and the app
     login.init_app(app)                         #opens session when user logs in and saves data                       
     mail.init_app(app)
+    cors.init_app(app)
+
     with app.app_context():                     #while working under the app context, the below happens
         from app.blueprints.main import bp as main_bp  #import blueprint functionality from main __init__
         app.register_blueprint(main_bp)         #register the main bp blueprints
@@ -33,6 +35,9 @@ def createApp(configClass=Config):
         
         from app.blueprints.blog import bp as blog_bp
         app.register_blueprint(blog_bp)
+
+        from app.blueprints.api import bp as api_bp
+        app.register_blueprint(api_bp)
 
         from app.blueprints.main import errors
         

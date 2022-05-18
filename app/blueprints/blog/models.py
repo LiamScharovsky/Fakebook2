@@ -1,11 +1,11 @@
 #MVC DESIGN PATTERN
-import uuid  #allows to generate random IDs 
-from datetime import datetime as dt
+import uuid  #allows to generate random IDs
+import os, base64
+from datetime import datetime as dt, timedelta
 from app import db              #imports SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash #gph hashes and salts, cph reverse engeneers to check 
 from flask_login import UserMixin
 from app import login
-
 
 followers = db.Table(
     'followers',    #name of table
@@ -24,12 +24,17 @@ class Post(db.Model):
     # Needs to be userID, it's a one to many (One author can have many posts)
     author = db.Column(db.ForeignKey('user.id'))
 
+    def fromDict(self, data):
+        for field in ['body', 'author']:                      #if data has body and author
+            if field in data:
+                setattr(self, field, data[field])            #set the field and it's data 
+
     def toDict(self):                                   #grab data 
         return {
             'id':self.id,
             'body': self.body,
             'dateCreated': self.dateCreated,
-            'author': User.query.get(self.author)
+            'author': User.query.get(self.author).toDict()
         }
 
     def __init__(self, **kwargs):
@@ -58,6 +63,18 @@ class User(db.Model, UserMixin):
         #lazy = dynamic means data being loaded is lazy loaded (only loads when needed)
         lazy='dynamic'
         )
+    token = db.Column(db.String, index=True, unique=True)#quick way to get access to data
+    tokenExpiration = db.Column(db.DateTime)
+
+    def getToken(self, expiresIn=3000):                             #expiration goes by hours
+        now = dt.utcnow()
+        if self.token and self.expiration > now:                        #if user has toke nand token is valid (expired)
+            return self.token                                           #return token
+        self.token = base64.b64encode(os.urandom(24)).decode('utf-8')    # else create token
+        self.tokenExpiration = now + timedelta(seconds= expiresIn)      #set expiration time for token
+        db.session.add(self)
+        return self.token 
+        
     #FOLLOWING STUFF
     def followedPosts(self):
         followed = Post.query.join(
@@ -83,6 +100,17 @@ class User(db.Model, UserMixin):
         return self.followed.filter(followers.c.followedID == user.id).count() > 0 #checks if the user is already being followed
         #filter() custom made filter if the ID of the person you're checking for appears, it means you're following them
 
+    def toDict(self):
+        return{
+            'id': self.id,
+            'firstName': self.firstName,
+            'lastName': self.lastName,
+            'email': self.email,
+            'postCount': len(Post.query.filter_by(author=self.id).all()),
+            'followers': len(self.followers.all()),
+            'following': len(self.followed.all())
+        }
+    
     #PASSWORD STUFF
     def generatePassword(self, password_from_form):
         self.password = generate_password_hash(password_from_form) #generates hashed password from user input
